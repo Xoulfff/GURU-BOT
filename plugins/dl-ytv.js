@@ -1,70 +1,79 @@
-import ytdl from 'ytdl-core';
 import fs from 'fs';
-import os from 'os';
+import path from 'path';
+import ytdl from 'youtubedl-core';
+import { Client } from 'undici';
+import { fileURLToPath } from 'url';
+import fetch from 'node-fetch';
 
-let limit = 500;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 let handler = async (m, { conn, args, isPrems, isOwner, usedPrefix, command }) => {
+  let chat = global.db.data.chats[m.chat];
   if (!args || !args[0]) throw `✳️ Example:\n${usedPrefix + command} https://youtu.be/YzkTFFwxtXI`;
   if (!args[0].match(/youtu/gi)) throw `❎ Verify that the YouTube link`;
+  await m.react('⏳')
 
-  let chat = global.db.data.chats[m.chat];
-  m.react(rwait);
-  try {
-    const info = await ytdl.getInfo(args[0]);
-    const format = ytdl.chooseFormat(info.formats, { quality: 'highest' });
-    if (!format) {
-      throw new Error('No valid formats found');
-    }
+  const videoDetails = await ytddl(args[0]);
+  if (!videoDetails) throw `❎ Error downloading video`;
 
-    if (format.contentLength / (1024 * 1024) >= limit) {
-      return m.reply(`≡ *GURU YTDL*\n\n▢ *⚖️Size*: ${format.contentLength / (1024 * 1024).toFixed(2)}MB\n▢ *🎞️Quality*: ${format.qualityLabel}\n\n▢ The file exceeds the download limit *+${limit} MB*`);
-    }
+  const { url, title, author, description } = videoDetails;
 
-    const tmpDir = os.tmpdir();
-    const fileName = `${tmpDir}/${info.videoDetails.videoId}.mp4`;
+  const response = await fetch(url);
+  const data = await response.buffer();
 
-    const writableStream = fs.createWriteStream(fileName);
-    ytdl(args[0], {
-      quality: format.itag,
-    }).pipe(writableStream);
-
-    writableStream.on('finish', () => {
-      conn.sendFile(
-        m.chat,
-        fs.readFileSync(fileName),
-        `${info.videoDetails.videoId}.mp4`,
-        `✼ ••๑⋯❀ Y O U T U B E ❀⋯⋅๑•• ✼
+  const caption = `✼ ••๑⋯❀ Y O U T U B E ❀⋯⋅๑•• ✼
 	  
-	  ❏ Title: ${info.videoDetails.title}
-	  ❐ Duration: ${info.videoDetails.lengthSeconds} seconds
-	  ❑ Views: ${info.videoDetails.viewCount}
-	  ❒ Upload: ${info.videoDetails.publishDate}
-	  ❒ Link: ${args[0]}
-	  
-	  ⊱─━⊱༻●༺⊰━─⊰`,
-        m,
-        false,
-        { asDocument: chat.useDocument }
-      );
+❏ Title: ${title || 'Unknown'}
+❒ Author: ${author || 'Unknown'}
+❒ Description: ${description || 'No description available'}
+❒ Link: ${args[0]}
+⊱─━⊱༻●༺⊰━─⊰`;
 
-      fs.unlinkSync(fileName); // Delete the temporary file
-      m.react(done);
-    });
-
-    writableStream.on('error', (error) => {
-      console.error(error);
-      m.reply('Error while trying to download the video. Please try again.');
-    });
-  } catch (error) {
-    console.error(error);
-    m.reply('Error while trying to process the video. Please try again.');
-  }
+  conn.sendFile(m.chat, data, `${title || 'video'}.mp4`, caption, m, false, { asDocument: chat.useDocument });
+  await m.react('✅')
 };
 
+
 handler.help = ['ytmp4 <yt-link>'];
-handler.tags = ['dl'];
-handler.command = ['ytmp4', 'video'];
+handler.tags = ['downloader'];
+handler.command = ['ytmp4', 'video', 'ytv'];
 handler.diamond = false;
 
 export default handler;
+
+async function getCookies() {
+  const cookiesPath = path.resolve(__dirname, '../Assets/cookies.json');
+  if (!fs.existsSync(cookiesPath)) {
+    throw new Error('Cookies file not found');
+  }
+  return JSON.parse(fs.readFileSync(cookiesPath, 'utf-8'));
+}
+
+async function createClient() {
+  const cookies = await getCookies();
+  return new Client("https://www.youtube.com", {
+    headers: {
+      "Cookie": cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ')
+    }
+  });
+}
+
+async function ytddl(url) {
+  try {
+    const client = await createClient();
+    const yt = await ytdl.getInfo(url, { requestOptions: { client: client } });
+    const link = ytdl.chooseFormat(yt.formats, { quality: 'highest', filter: 'audioandvideo' });
+
+    return {
+      url: link.url,
+      title: yt.videoDetails.title,
+      author: yt.videoDetails.author.name,
+      description: yt.videoDetails.description,
+    };
+  } catch (error) {
+    console.error("An error occurred:", error);
+    return null;  // Ensure a null is returned on error
+  }
+}
 

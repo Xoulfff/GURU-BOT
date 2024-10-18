@@ -1,19 +1,47 @@
 import fetch from 'node-fetch'
-let handler = async(m, { conn, text }) => {
-if (!text) throw `*ENTER NAME OF SONG*`
-try {
-let res = await fetch(`https://api.lolhuman.xyz/api/spotifysearch?apikey=${lolkeysapi}&query=${text}`)
-let json = await res.json()
-let { link } = json.result[0]
-let res2 = await fetch(`https://api.lolhuman.xyz/api/spotify?apikey=${lolkeysapi}&url=${link}`)
-let json2 = await res2.json()
-let { thumbnail, title, artists } = json2.result
-let spotifyi = `❒═════❬ 𝐒𝐏𝐎𝐓𝐈𝐅𝐘 ❭═════╾❒\n┬\n├‣✨ *TITLE:* ${title}\n┴\n┬\n├‣🗣️ *ARTIST:* ${artists}\n┴\n┬\n├‣🌐 *𝚄𝚁𝙻*: ${link}\n┴\n┬\n├‣💚 *SEARCH URL:* ${json2.result.link}\n┴`
-conn.sendFile(m.chat, thumbnail, 'error.jpg', spotifyi, m)
-let aa = await conn.sendMessage(m.chat, { audio: { url: json2.result.link }, fileName: `error.mp3`, mimetype: 'audio/mp4' }, { quoted: m })  
-if (!aa) return conn.sendFile(m.chat, json2.result.link, 'error.mp3', null, m, false, { mimetype: 'audio/mp4' }) 
-} catch {
-throw '* 𝙴𝚁𝚁𝙾𝚁*'
-}}
+import displayLoadingScreen from '../lib/loading.js'
+let handler = async (m, { conn, text }) => {
+  if (!text) {
+    console.log('No song name provided.')
+    throw `*Please enter a song name*`
+  }
+  m.react('🎶')
+  //await displayLoadingScreen(conn, m.chat)
+  let pp = 'https://wallpapercave.com/wp/wp7932387.jpg'
+  const query = encodeURIComponent(text)
+  let res = `https://api.guruapi.tech/spotifysearch?query=${query}`
+  let spurl = await fetch(res)
+  spurl = await spurl.json()
+  let dlres = await fetch(`https://api.guruapi.tech/spotifydl?url=${spurl.data[0].url}`)
+  dlres = await dlres.json()
+  let sturl  = dlres.data.url
+
+  let doc = {
+    audio: {
+      url: sturl,
+    },
+    mimetype: 'audio/mpeg',
+    ptt: true,
+    waveform: [100, 0, 100, 0, 100, 0, 100],
+    fileName: 'Guru.mp3',
+
+    contextInfo: {
+      mentionedJid: [m.sender],
+      externalAdReply: {
+        title: '↺ |◁   II   ▷|   ♡',
+        body: `Now playing: ${text}`,
+        thumbnailUrl: dlres.data.thumbnail,
+        sourceUrl: null,
+        mediaType: 1,
+        renderLargerThumbnail: false,
+      },
+    },
+  }
+
+  await conn.sendMessage(m.chat, doc, { quoted: m })
+}
+handler.help = ['spotify']
+handler.tags = ['downloader']
 handler.command = /^(spotify|song)$/i
+
 export default handler

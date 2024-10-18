@@ -1,30 +1,32 @@
-import fetch from 'node-fetch';
+import fetch from 'node-fetch'
+import uploadImage from '../lib/uploadImage.js'
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text) throw `*This command generates image from texts*\n\n*𝙴xample usage*\n*◉ ${usedPrefix + command} Beautiful animegirl*\n*◉ ${usedPrefix + command} elon musk in pink output*`;
+  if (!text)
+    throw `*This command generates images from text prompts*\n\n*𝙴xample usage*\n*◉ ${usedPrefix + command} Beautiful anime girl*\n*◉ ${usedPrefix + command} Elon Musk in pink output*`
 
   try {
-    m.reply('*Please wait, generating images...*');
+    m.reply('*Please wait, generating images...*')
 
-    const endpoint = `https://gurugpt.cyclic.app/dalle?prompt=${encodeURIComponent(text)}&model=art`;
-    const response = await fetch(endpoint);
-    const data = await response.json();
+    const endpoint = `https://api.gurusensei.workers.dev/dream?prompt=${encodeURIComponent(text)}`
+    const response = await fetch(endpoint)
 
-    if (data.result && Array.isArray(data.result)) {
-      for (let i = 0; i < Math.min(data.result.length, 2); i++) {
-        const imageUrl = data.result[i];
-        const imageResponse = await fetch(imageUrl);
-        const imageBuffer = await imageResponse.buffer();
-        await conn.sendFile(m.chat, imageBuffer, null, null, m);
-      }
+    if (response.ok) {
+      const imageBuffer = await response.buffer()
+      let imgurl = await uploadImage(imageBuffer)
+      await conn.sendButton(m.chat,'Here is your Result', author, imgurl, [['Script', `.sc`]], null, [['Follow Me', `https://github.com/Guru322`]], m)
     } else {
-      throw '*Image generation failed*';
+      throw '*Image generation failed*'
     }
   } catch {
-    throw '*Oops! Something went wrong while generating images. Please try again later.*';
+    throw '*Oops! Something went wrong while generating images. Please try again later.*'
   }
-};
+}
 
-handler.command = ['ai2', 'dalle', 'gen', 'gimg', 'openai2'];
-export default handler;
+handler.help = ['dalle']
+handler.tags = ['AI']
+handler.command = ['dalle', 'gen', 'imagine', 'openai2']
+export default handler
+
+
 
